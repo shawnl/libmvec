@@ -1,3 +1,20 @@
+/* Double-precision vector log(x) function.
+   Copyright (C) 2019 Free Software Foundation, Inc.
+   This file is part of the GNU C Library.
+
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
+
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, see
+   <http://www.gnu.org/licenses/>.  */
 #include <altivec.h>
 #include <stdint.h>
 // Ported from musl, which is licensed under the MIT license:
@@ -292,7 +309,8 @@ vector double _ZGV9N2v_log(vector double x) {
     oned.d = one;
     v64u is_one = vec_cmpeq(xi, oned.l);
     res.l = vec_sel(res.l, zero, is_one);
-  }
+  } else
+    res.l = zero;
 
   v64u infexp = {0x7ff0000000000000, 0x7ff0000000000000};
   v64u is_special_cases = vec_cmpge(xi - 0x0010000000000000, infexp - 0x0010000000000000);
@@ -307,16 +325,18 @@ vector double _ZGV9N2v_log(vector double x) {
     v64u is_nan = vec_cmpeq(xi & infexp, infexp) & ~is_inf;
     res.l = vec_sel(res.l, infexp + 1/*NaN*/, is_nan | (is_neg & ~is_zero));
 
-    /* subnormals: normalize */
+    /* subnormals: normalize, remove from is_special_cases */
+    v64u is_not_subnormal = is_nan | is_neg | is_zero | is_inf;
     un.d = x * 0x1p52;
-    xi = un.l - (52ULL << 52);
+    xi = vec_sel(xi, un.l - (52ULL << 52), is_special_cases & ~is_not_subnormal);
+    is_special_cases = is_not_subnormal;
   }
   /* x = 2^k z; where z is in range [OFF,2*OFF) and exact.
 	   The range is split into N subintervals.
 	   The ith subinterval contains z and c is near its center.  */
   v64u tmp = xi - OFF;
   v64u i = (tmp >> (52 - LOG_TABLE_BITS)) % N;
-  v64u k = (v64u)((v64i)tmp >> 52);
+  v64i k = (v64u)((v64i)tmp >> 52);
   v64u iz = xi - (tmp & 0xfffULL << 52);
 
   vector double invc = {T[i[0]].invc, T[i[1]].invc};
@@ -351,28 +371,4 @@ vector double _ZGV9N2v_log(vector double x) {
       (a3 + r * a4)) + hid;
   res.d = vec_sel(res.d, y, ~is_close_to_one & ~is_special_cases);
   return res.d;
-}
-
-#include <assert.h>
-#include <math.h>
-void test(vector double a) {
-  vector double b = _ZGV9N2v_log(a);
-for (int i=0;i<2;i++) {
-if (isnan(b[i]))
-  assert(isnan(log(a[i])));
-else
-  assert(log(a[i]) == b[i]);
-}
-}
-
-int main() {
- vector double a = {0.0, 1.0};
- test(a);
- vector double b = {INFINITY, -INFINITY};
- test(b);
- vector double c = {-0.0, 56.13};
- test(c);
- vector double d = {0.96, 1.13};
- test(d);
-
 }
