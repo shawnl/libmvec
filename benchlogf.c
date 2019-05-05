@@ -1,5 +1,5 @@
-vector double _ZGV9N2v_log(vector double);
-vector float _ZGV9N4v_logf(vector float);
+vector double _ZGVN2v_log(vector double);
+vector float _ZGVN4v_logf(vector float);
 typedef union {
 float f;
 double d;
@@ -36,7 +36,7 @@ int main() {
     data[i+2] &= 0xffff;
     data[i+3] &= 0xffff;
     vector float in = {(float)data[i], (float)data[i+1], (float)data[i+2], (float)data[i+3]};
-    vector float four = _ZGV9N4v_logf(in);
+    vector float four = _ZGVN4v_logf(in);
     for (int j=0;j<4;j++) {
       four[j] = isnan(four[j]) ? NAN : four[j];
 us u;
@@ -57,7 +57,7 @@ dataconv[i+j] = u3.f;
 
   for (int i=0;i<SIZE/4;i+=4) {
     vector float in = vec_ld(0, &dataconv[i]);
-    vector float res = _ZGV9N4v_logf(in);
+    vector float res = _ZGVN4v_logf(in);
     *(vector float*)&bench[i] = res;
   }
   for (int i=0;i<SIZE/4;i+=1) {
@@ -67,20 +67,25 @@ struct timespec a, b, c;
 clock_gettime(CLOCK_MONOTONIC, &a);
   for (int i=0;i<SIZE/4;i+=4) {
     vector float in = vec_ld(0, &dataconv[i]);
-    vector float res = _ZGV9N4v_logf(in);
+    vector float res = _ZGVN4v_logf(in);
     *(vector float*)&bench[i] = res;
   }
 clock_gettime(CLOCK_MONOTONIC, &b);
+  for (int i=0;i<SIZE/4;i+=1) {
+    bench2[i] = logf(dataconv[i]);
+  }
+clock_gettime(CLOCK_MONOTONIC, &c);
+
   for (int i=0;i<SIZE/4;i+=4) {
     vector float in = vec_ld(0, &dataconv[i]);
     vector double in1 = vec_unpackh(in);
     vector double in2 = vec_unpackl(in);
-    vector double res1 = _ZGV9N2v_log(in1);
-    vector double res2 = _ZGV9N2v_log(in2);
+    vector double res1 = _ZGVN2v_log(in1);
+    vector double res2 = _ZGVN2v_log(in2);
     vector float res = vec_pack(res1, res2);
     *(vector float*)&bench[i] = res;
   }
-clock_gettime(CLOCK_MONOTONIC, &c);
+//clock_gettime(CLOCK_MONOTONIC, &c);
   double t[3] = {(double)(a.tv_sec * 1000000) + a.tv_nsec / 1000, (double)(b.tv_sec * 1000000) + b.tv_nsec / 1000, (double)(c.tv_sec * 1000000) + c.tv_nsec / 1000};
   printf("non-opt: %f (%f MiB/s)\nopt: %f (%f MiB/s) (%f)\n",
     (t[2] - t[1]) / 1000000, SIZEM / ((t[2] - t[1]) / 1000000),

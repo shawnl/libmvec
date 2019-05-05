@@ -1,4 +1,11 @@
-#include "svml_s_log2.c"
+vector double _ZGVN2v_log(vector double);
+typedef union {
+float f;
+double d;
+long long unsigned l;
+unsigned u;
+} us;
+#include <altivec.h>
 #include <math.h>
 #define EXIT_UNSUPPORTED 77
 #include <stdint.h>
@@ -29,7 +36,7 @@ int main() {
 dataconv[i] = (double)data[i];
 dataconv[i+1] = (double)data[i+1];
     vector double in = vec_ld(0, &dataconv[i]);
-    vector double four = _ZGV9N2v_log(in);
+    vector double four = _ZGVN2v_log(in);
     for (int j=0;j<2;j++) {
       four[j] = isnan(four[j]) ? NAN : four[j];
 us u;
@@ -47,13 +54,11 @@ us u3;
     }
   }
 
-  gettimeofday(&a, NULL);
   for (int i=0;i<SIZE/8;i+=4) {
     vector double in = vec_ld(0, &dataconv[i]);
-    vector double res = _ZGV9N2v_log(in);
+    vector double res = _ZGVN2v_log(in);
     *(vector double*)&bench[i] = res;
   }
-  gettimeofday(&b, NULL);
   for (int i=0;i<SIZE/8;i+=1) {
     bench2[i] = log(dataconv[i]);
   }
@@ -61,7 +66,7 @@ struct timespec q, w, e;
 clock_gettime(CLOCK_MONOTONIC, &q);
   for (int i=0;i<SIZE/8;i+=4) {
     vector double in = vec_ld(0, &dataconv[i]);
-    vector double res = _ZGV9N2v_log(in);
+    vector double res = _ZGVN2v_log(in);
     *(vector double*)&bench[i] = res;
   }
 clock_gettime(CLOCK_MONOTONIC, &w);
