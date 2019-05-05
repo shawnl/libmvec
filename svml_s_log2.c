@@ -234,6 +234,8 @@ typedef union {
 typedef union {
   double d;
   uint64_t l;
+  unsigned u;
+  float f;
 } us;
 
 #define T __log_data.tab
