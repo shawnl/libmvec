@@ -3,7 +3,7 @@
 #define EXIT_UNSUPPORTED 77
 #include <stdint.h>
 #include <stdio.h>
-#include <sys/time.h>
+#include <time.h>
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -57,18 +57,19 @@ us u3;
   for (int i=0;i<SIZE/8;i+=1) {
     bench2[i] = log(dataconv[i]);
   }
-  gettimeofday(&a, NULL);
+struct timespec q, w, e;
+clock_gettime(CLOCK_MONOTONIC, &q);
   for (int i=0;i<SIZE/8;i+=4) {
     vector double in = vec_ld(0, &dataconv[i]);
     vector double res = _ZGV9N2v_log(in);
     *(vector double*)&bench[i] = res;
   }
-  gettimeofday(&b, NULL);
+clock_gettime(CLOCK_MONOTONIC, &w);
   for (int i=0;i<SIZE/8;i+=1) {
     bench2[i] = log(dataconv[i]);
   }
-  gettimeofday(&c, NULL);
-  double t[3] = {a.tv_sec * 1000000 + a.tv_usec, b.tv_sec * 1000000 + b.tv_usec, c.tv_sec * 1000000 + c.tv_usec};
+clock_gettime(CLOCK_MONOTONIC, &e);
+  double t[3] = {(double)(q.tv_sec * 1000000) + q.tv_nsec / 1000, (double)(w.tv_sec * 1000000) + w.tv_nsec / 1000, (double)(e.tv_sec * 1000000) + e.tv_nsec / 1000};
   printf("non-opt: %f (%f MiB/s)\nopt: %f (%f MiB/s) (%f)\n",
     (t[2] - t[1]) / 1000000, SIZEM / ((t[2] - t[1]) / 1000000),
     (t[1] - t[0]) / 1000000, SIZEM / ((t[1] - t[0]) / 1000000),

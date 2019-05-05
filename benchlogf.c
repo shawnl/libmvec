@@ -11,7 +11,7 @@ unsigned u;
 #define EXIT_UNSUPPORTED 77
 #include <stdint.h>
 #include <stdio.h>
-#include <sys/time.h>
+#include <time.h>
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -30,7 +30,6 @@ int main() {
   ret = fread(data, 4, SIZE/4, random);
   if (ret != SIZE/4)
     return 1;
-  struct timeval a, b, c, e, f;
   for (int i=0;i<SIZE/4;i+=4) {
     data[i] &= 0xffff;
     data[i+1] &= 0xffff;
@@ -48,31 +47,30 @@ u2.f = isnan(u2.f) ? NAN : u2.f;
 us u3;
 u3.u = data[i+j];
 dataconv[i+j] = u3.f;
-      if (u.u != u2.u) {
-        printf("round %u: %.15e -> %.15e and %.15e not equal!\n %.15e\n", i, in[j], four[j], logf(data[i+j]), log(data[i+j]));
-        volatile vector float again = _ZGV9N4v_logf(in);
-        return 1;
-      }
+//      if (u.u != u2.u) {
+//        printf("round %u: %.15e -> %.15e and %.15e not equal!\n %.15e\n", i, in[j], four[j], logf(data[i+j]), log(data[i+j]));
+//        volatile vector float again = _ZGV9N4v_logf(in);
+//        return 1;
+//      }
     }
   }
 
-  gettimeofday(&a, NULL);
   for (int i=0;i<SIZE/4;i+=4) {
     vector float in = vec_ld(0, &dataconv[i]);
     vector float res = _ZGV9N4v_logf(in);
     *(vector float*)&bench[i] = res;
   }
-  gettimeofday(&b, NULL);
   for (int i=0;i<SIZE/4;i+=1) {
     bench2[i] = logf(dataconv[i]);
   }
-  gettimeofday(&a, NULL);
+struct timespec a, b, c;
+clock_gettime(CLOCK_MONOTONIC, &a);
   for (int i=0;i<SIZE/4;i+=4) {
     vector float in = vec_ld(0, &dataconv[i]);
     vector float res = _ZGV9N4v_logf(in);
     *(vector float*)&bench[i] = res;
   }
-  gettimeofday(&b, NULL);
+clock_gettime(CLOCK_MONOTONIC, &b);
   for (int i=0;i<SIZE/4;i+=4) {
     vector float in = vec_ld(0, &dataconv[i]);
     vector double in1 = vec_unpackh(in);
@@ -82,8 +80,8 @@ dataconv[i+j] = u3.f;
     vector float res = vec_pack(res1, res2);
     *(vector float*)&bench[i] = res;
   }
-  gettimeofday(&c, NULL);
-  double t[3] = {a.tv_sec * 1000000 + a.tv_usec, b.tv_sec * 1000000 + b.tv_usec, c.tv_sec * 1000000 + c.tv_usec};
+clock_gettime(CLOCK_MONOTONIC, &c);
+  double t[3] = {(double)(a.tv_sec * 1000000) + a.tv_nsec / 1000, (double)(b.tv_sec * 1000000) + b.tv_nsec / 1000, (double)(c.tv_sec * 1000000) + c.tv_nsec / 1000};
   printf("non-opt: %f (%f MiB/s)\nopt: %f (%f MiB/s) (%f)\n",
     (t[2] - t[1]) / 1000000, SIZEM / ((t[2] - t[1]) / 1000000),
     (t[1] - t[0]) / 1000000, SIZEM / ((t[1] - t[0]) / 1000000), (t[2] - t[1]) / (t[1] - t[0]));
