@@ -1,10 +1,11 @@
-vector double _ZGVN2v_log(vector double);
+vector double _ZGVbN2v_log(vector double);
 typedef union {
 float f;
 double d;
 long long unsigned l;
 unsigned u;
 } us;
+#define AVOID_SPECIAL_NUMBERS 1
 #include <altivec.h>
 #include <math.h>
 #define EXIT_UNSUPPORTED 77
@@ -31,32 +32,39 @@ int main() {
     return 1;
   struct timeval a, b, c;
   for (int i=0;i<SIZE/8;i+=2) {
+#if AVOID_SPECIAL_NUMBERS
     data[i] &= 0xffffffff;
     data[i+1] &= 0xffffffff;
-dataconv[i] = (double)data[i];
-dataconv[i+1] = (double)data[i+1];
+dataconv[i] = (double)data[i] + 1;
+dataconv[i+1] = (double)data[i+1] + 1;
+#else
+us d;
+d.l = data[i];
+dataconv[i] = d.d;
+d.l = data[i+1];
+dataconv[i+1] = d.d;
+#endif
     vector double in = vec_ld(0, &dataconv[i]);
-    vector double four = _ZGVN2v_log(in);
+    vector double four = _ZGVbN2v_log(in);
     for (int j=0;j<2;j++) {
       four[j] = isnan(four[j]) ? NAN : four[j];
 us u;
 u.d = four[j];
 us u2;
-u2.d = log((double)data[i+j]);
+u2.d = log((double)dataconv[i+j]);
 u2.d = isnan(u2.d) ? NAN : u2.d;
 us u3;
-// vector routine more accurate due to use of fused multiply-add
-//      if (u.l != u2.l) {
-//        printf("round %u: %.25e -> %.25e and %.25e not equal!\n", i, in[j], four[j], log(data[i+j]));
-//        volatile vector double again = _ZGV9N2v_log(in);
-//        return 1;
-//      }
+      if (u.l != u2.l) {
+        printf("round %u: %.50e -> %.50e and %.50e not equal!\n", i, in[j], four[j], log(dataconv[i+j]));
+        volatile vector double again = _ZGVbN2v_log(in);
+        return 1;
+      }
     }
   }
 
   for (int i=0;i<SIZE/8;i+=4) {
     vector double in = vec_ld(0, &dataconv[i]);
-    vector double res = _ZGVN2v_log(in);
+    vector double res = _ZGVbN2v_log(in);
     *(vector double*)&bench[i] = res;
   }
   for (int i=0;i<SIZE/8;i+=1) {
@@ -66,7 +74,7 @@ struct timespec q, w, e;
 clock_gettime(CLOCK_MONOTONIC, &q);
   for (int i=0;i<SIZE/8;i+=4) {
     vector double in = vec_ld(0, &dataconv[i]);
-    vector double res = _ZGVN2v_log(in);
+    vector double res = _ZGVbN2v_log(in);
     *(vector double*)&bench[i] = res;
   }
 clock_gettime(CLOCK_MONOTONIC, &w);

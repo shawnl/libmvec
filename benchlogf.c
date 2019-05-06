@@ -47,11 +47,11 @@ u2.f = isnan(u2.f) ? NAN : u2.f;
 us u3;
 u3.u = data[i+j];
 dataconv[i+j] = u3.f;
-//      if (u.u != u2.u) {
-//        printf("round %u: %.15e -> %.15e and %.15e not equal!\n %.15e\n", i, in[j], four[j], logf(data[i+j]), log(data[i+j]));
-//        volatile vector float again = _ZGV9N4v_logf(in);
-//        return 1;
-//      }
+      if (u.u != u2.u) {
+        printf("round %u: %.15e -> %.15e and %.15e not equal!\n %.15e\n", i, in[j], four[j], logf(data[i+j]), log(data[i+j]));
+        volatile vector float again = _ZGVN4v_logf(in);
+        return 1;
+      }
     }
   }
 
