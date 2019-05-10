@@ -20,9 +20,9 @@ unsigned u;
 int main() {
   uint64_t ret;
   uint64_t *data = malloc(SIZE * 4);
-  double *bench = (double *)((char*)data + SIZE);
-  double *bench2 = (double *)((char*)bench + SIZE);
-  double *dataconv = (double *)((char*)bench2 + SIZE);
+  volatile double *bench = (double *)((char*)data + SIZE);
+  volatile double *bench2 = (double *)((char*)bench + SIZE);
+  volatile double *dataconv = (double *)((char*)bench2 + SIZE);
   assert(data && bench && bench2 && dataconv);
   FILE *random = fopen("/dev/urandom", "r");
   if (!random)
@@ -62,7 +62,7 @@ us u3;
     }
   }
 
-  for (int i=0;i<SIZE/8;i+=4) {
+  for (int i=0;i<SIZE/8;i+=2) {
     vector double in = vec_ld(0, &dataconv[i]);
     vector double res = _ZGVbN2v_log(in);
     *(vector double*)&bench[i] = res;
@@ -70,9 +70,12 @@ us u3;
   for (int i=0;i<SIZE/8;i+=1) {
     bench2[i] = log(dataconv[i]);
   }
+uint64_t table[20];
+uint64_t tableopt[20];
+for (int j=0;j<20;j++) {
 struct timespec q, w, e;
 clock_gettime(CLOCK_MONOTONIC, &q);
-  for (int i=0;i<SIZE/8;i+=4) {
+  for (int i=0;i<SIZE/8;i+=2) {
     vector double in = vec_ld(0, &dataconv[i]);
     vector double res = _ZGVbN2v_log(in);
     *(vector double*)&bench[i] = res;
@@ -87,5 +90,23 @@ clock_gettime(CLOCK_MONOTONIC, &e);
     (t[2] - t[1]) / 1000000, SIZEM / ((t[2] - t[1]) / 1000000),
     (t[1] - t[0]) / 1000000, SIZEM / ((t[1] - t[0]) / 1000000),
     (t[2] - t[1]) / (t[1] - t[0]));
+table[j] = t[2] - t[1];
+tableopt[j] = t[1] - t[0];
+}
+uint64_t sum = 0;
+uint64_t sumopt = 0;
+for (int j=0;j<20;j++) {
+  sum += table[j];
+  sumopt += tableopt[j];
+}
+double mean = sum / 19;
+double meanopt = sumopt / 19;
+double sd = 0.0;
+double sdopt = 0.0;
+for (int j=0;j<20;j++) {
+  sd +=( (double)(table[j] - mean) * (double)(table[j] - mean)) / 1000000000000.0;
+  sdopt +=( (double)(tableopt[j] - mean) * (double)(tableopt[j] - mean)) / 1000000000000.0;
+}
+printf("opt: mean %f (sd %f)\nnonopt: mean %f (sd %f)\n", SIZEM / (meanopt / 1000000), sqrt(sdopt), SIZEM / (mean / 1000000), sqrt(sd));
   return 0;
 }
