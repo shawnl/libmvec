@@ -62,9 +62,9 @@ vector float _ZGVbN4v_expf (vector float x) {
   us underflowu;
   underflowu.f = -0x1.9fe368p6f;
 #ifdef __ORDER_BIG_ENDIAN__
-  v64u __init1 = {((uint64_t)overflowu.u << 32) + (uint64_t)underflowu.u, invLn2Nu.l};
+  v64u __init1 = {((uint64_t) overflowu.u << 32) + (uint64_t) underflowu.u, invLn2Nu.l};
 #else
-  v64u __init1 = {(uint64_t)overflowu.u + ((uint64_t)underflowu.u << 32), invLn2Nu.l};
+  v64u __init1 = {(uint64_t) overflowu.u + ((uint64_t) underflowu.u << 32), invLn2Nu.l};
 #endif
   constants2.l = __init1;
   vector unsigned zero = {0, 0, 0, 0};
@@ -96,7 +96,7 @@ vector float _ZGVbN4v_expf (vector float x) {
   vector double zl = InvLn2Nv * xl;
   vector double zr = InvLn2Nv * xr;
 #if TOINT_INTRINSICS_VECTOR
-  vector double kdl = roundtoint(zl);
+  vector double kdl = roundtoint (zl);
   vector double kdl = roundtoint (zl);
   v64u kil = converttoint (zl);
   v64u kir = converttoint (zr);
@@ -126,7 +126,7 @@ vector float _ZGVbN4v_expf (vector float x) {
   u sru;
   sru.l = tr;
   // This cast is obnoxious, but there is no vec_ld for double
-  vector double c = (vector double)vec_ld(0, (vector unsigned*)&C[0]);
+  vector double c = (vector double) vec_ld (0, (vector unsigned*) &C[0]);
   vector double c0 = {c[0], c[0]};
   vector double c1 = {c[1], c[1]};
   zl = c0 * rl + c1;
@@ -140,6 +140,6 @@ vector float _ZGVbN4v_expf (vector float x) {
   yr = zr * r2r + yr;
   yl = yl * slu.d;
   yr = yr * sru.d;
-  vector float restmp = {(float)yl[0], (float)yl[1], (float)yr[0], (float)yr[1]};
-  return vec_sel(restmp, res.f, is_special_case);
+  vector float restmp = {(float) yl[0], (float) yl[1], (float) yr[0], (float) yr[1]};
+  return vec_sel (restmp, res.f, is_special_case);
 }
