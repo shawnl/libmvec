@@ -25,16 +25,16 @@
 
 typedef vector long long unsigned v64u;
 typedef union {
-  vector unsigned u;
-  vector float f;
-  v64u l;
-  vector double d;
+	vector unsigned u;
+	vector float f;
+	v64u l;
+	vector double d;
 } u;
 typedef union {
-  double d;
-  uint64_t l;
-  unsigned u;
-  float f;
+	double d;
+	int64_t l;
+	unsigned u;
+	float f;
 } us;
 
 #define N (1 << EXP2F_TABLE_BITS)
@@ -46,35 +46,35 @@ typedef union {
 #define UNDERFLOWV 4
 
 vector float _ZGVbN4v_expf (vector float x) {
-  u res;
-  u xu;
-  xu.f = x;
-  us c88;
-  c88.f = 88.0f;
-  us inf;
-  inf.f = INFINITY;
-  vector unsigned constants = {(c88.u & 0xfff00000) << 1, OVERFLOWV, inf.u, UNDERFLOWV};
-  us invLn2Nu;
-  invLn2Nu.d = InvLn2N;
-  u constants2;
-  us overflowu;
-  overflowu.f = 0x1.62e42ep6f;
-  us underflowu;
-  underflowu.f = -0x1.9fe368p6f;
+	u res;
+	u xu;
+	xu.f = x;
+	us c88;
+	c88.f = 88.0f;
+	us inf;
+	inf.f = INFINITY;
+	vector unsigned constants = {(c88.u & 0xfff00000) << 1, OVERFLOWV, inf.u, UNDERFLOWV};
+	us invLn2Nu;
+	invLn2Nu.d = InvLn2N;
+	u constants2;
+	us overflowu;
+	overflowu.f = 0x1.62e42ep6f;
+	us underflowu;
+	underflowu.f = -0x1.9fe368p6f;
 #ifdef __ORDER_BIG_ENDIAN__
-  v64u __init1 = {((uint64_t) overflowu.u << 32) + (uint64_t) underflowu.u, invLn2Nu.l};
+	v64u __init1 = {((uint64_t) overflowu.u << 32) + (uint64_t) underflowu.u, invLn2Nu.l};
 #else
-  v64u __init1 = {(uint64_t) overflowu.u + ((uint64_t) underflowu.u << 32), invLn2Nu.l};
+	v64u __init1 = {(uint64_t) overflowu.u + ((uint64_t) underflowu.u << 32), invLn2Nu.l};
 #endif
-  constants2.l = __init1;
-  vector unsigned zero = {0, 0, 0, 0};
-  vector unsigned v88 = vec_splat (constants, 0);
-  vector unsigned is_special_case = (vector unsigned) vec_cmpge (xu.u << 1, v88);
-  if (!vec_all_eq (is_special_case, zero)) {
-    vector unsigned inf = vec_splat (constants, 2);
-    //vector unsigned ninf = inf | (1 << 31);
-    //vector unsigned is_ninf = (vector unsigned)vec_cmpeq(xu.u, ninf);
-    vector unsigned is_inf_or_ninf_or_nan = (vector unsigned) vec_cmpge (xu.u, inf);
+	constants2.l = __init1;
+	vector unsigned zero = {0, 0, 0, 0};
+	vector unsigned v88 = vec_splat (constants, 0);
+	vector unsigned is_special_case = (vector unsigned) vec_cmpge (xu.u << 1, v88);
+	if (!vec_all_eq (is_special_case, zero)) {
+		vector unsigned inf = vec_splat (constants, 2);
+		//vector unsigned ninf = inf | (1 << 31);
+		//vector unsigned is_ninf = (vector unsigned)vec_cmpeq(xu.u, ninf);
+		vector unsigned is_inf_or_ninf_or_nan = (vector unsigned) vec_cmpge (xu.u, inf);
     //res.u = vec_sel(res.u, zero, is_ninf);
     res.u = zero; // We can re-use the is_special_case check here.
     u xpx;
