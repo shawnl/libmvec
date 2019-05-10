@@ -20,9 +20,11 @@ unsigned u;
 #define SIZEM 32
 #define SIZE SIZEM * 1024 * 1024
 int main() {
-vector float ind = {79, 79, 79, 0x1p-500};
-        volatile vector float agdain = _ZGVbN4v_expf(ind);
-
+vector float ind = {79, 79, 79, 1.17549435082228750797e-38};
+         vector float agdain = _ZGVbN4v_expf(ind);
+for (int i=0;i<4;i++) {
+assert(agdain[i] == expf(ind[i]));
+}
   uint64_t ret;
   uint32_t *data = malloc(SIZE * 4);
   volatile float *bench = (float *)((char*)data + SIZE);

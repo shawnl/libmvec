@@ -20,7 +20,7 @@
 
 #define TOINT_INTRINSICS_VECTOR 0
 
-#include "expf_data.h"
+#include "exp2f_data.h"
 //#include <sysdeps/ieee754/flt-32/math_config.h>
 
 typedef vector long long unsigned v64u;
@@ -62,9 +62,9 @@ vector float _ZGVbN4v_expf (vector float x) {
   us underflowu;
   underflowu.f = -0x1.9fe368p6f;
 #ifdef __ORDER_BIG_ENDIAN__
-  v64u __init1 = {overflowu.u << 32 + underflowu.u, invLn2Nu.l};
+  v64u __init1 = {((uint64_t)overflowu.u << 32) + (uint64_t)underflowu.u, invLn2Nu.l};
 #else
-  v64u __init1 = {overflowu.u + underflowu.u << 32, invLn2Nu.l};
+  v64u __init1 = {(uint64_t)overflowu.u + ((uint64_t)underflowu.u << 32), invLn2Nu.l};
 #endif
   constants2.l = __init1;
   vector unsigned zero = {0, 0, 0, 0};
@@ -125,7 +125,8 @@ vector float _ZGVbN4v_expf (vector float x) {
   slu.l = tl;
   u sru;
   sru.l = tr;
-  vector double c = vec_ld(0, &C[0]);
+  // This cast is obnoxious, but there is no vec_ld for double
+  vector double c = (vector double)vec_ld(0, (vector unsigned*)&C[0]);
   vector double c0 = {c[0], c[0]};
   vector double c1 = {c[1], c[1]};
   zl = c0 * rl + c1;
@@ -136,7 +137,7 @@ vector float _ZGVbN4v_expf (vector float x) {
   vector double yl = c2 * rl + 1;
   vector double yr = c2 * rr + 1;
   yl = zl * r2l + yl;
-  yr = zr + r2r + yr;
+  yr = zr * r2r + yr;
   yl = yl * slu.d;
   yr = yr * sru.d;
   vector float restmp = {(float)yl[0], (float)yl[1], (float)yr[0], (float)yr[1]};
