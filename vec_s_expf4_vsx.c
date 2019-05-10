@@ -1,0 +1,144 @@
+/* Single-precision vector expf(x) function.
+   Copyright (C) 2019 Free Software Foundation, Inc.
+   This file is part of the GNU C Library.
+
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
+
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, see
+   <http://www.gnu.org/licenses/>.  */
+#include <altivec.h>
+#include <math.h>
+
+#define TOINT_INTRINSICS_VECTOR 0
+
+#include "expf_data.h"
+//#include <sysdeps/ieee754/flt-32/math_config.h>
+
+typedef vector long long unsigned v64u;
+typedef union {
+  vector unsigned u;
+  vector float f;
+  v64u l;
+  vector double d;
+} u;
+typedef union {
+  double d;
+  uint64_t l;
+  unsigned u;
+  float f;
+} us;
+
+#define N (1 << EXP2F_TABLE_BITS)
+#define InvLn2N __exp2f_data.invln2_scaled
+#define T __exp2f_data.tab
+#define C __exp2f_data.poly_scaled
+
+#define OVERFLOWV 0x7f800000
+#define UNDERFLOWV 4
+
+vector float _ZGVbN4v_expf (vector float x) {
+  u res;
+  u xu;
+  xu.f = x;
+  us c88;
+  c88.f = 88.0f;
+  us inf;
+  inf.f = INFINITY;
+  vector unsigned constants = {(c88.u & 0xfff00000) << 1, OVERFLOWV, inf.u, UNDERFLOWV};
+  us invLn2Nu;
+  invLn2Nu.d = InvLn2N;
+  u constants2;
+  us overflowu;
+  overflowu.f = 0x1.62e42ep6f;
+  us underflowu;
+  underflowu.f = -0x1.9fe368p6f;
+#ifdef __ORDER_BIG_ENDIAN__
+  v64u __init1 = {overflowu.u << 32 + underflowu.u, invLn2Nu.l};
+#else
+  v64u __init1 = {overflowu.u + underflowu.u << 32, invLn2Nu.l};
+#endif
+  constants2.l = __init1;
+  vector unsigned zero = {0, 0, 0, 0};
+  vector unsigned v88 = vec_splat (constants, 0);
+  vector unsigned is_special_case = (vector unsigned) vec_cmpge (xu.u << 1, v88);
+  if (!vec_all_eq (is_special_case, zero)) {
+    vector unsigned inf = vec_splat (constants, 2);
+    //vector unsigned ninf = inf | (1 << 31);
+    //vector unsigned is_ninf = (vector unsigned)vec_cmpeq(xu.u, ninf);
+    vector unsigned is_inf_or_ninf_or_nan = (vector unsigned) vec_cmpge (xu.u, inf);
+    //res.u = vec_sel(res.u, zero, is_ninf);
+    res.u = zero; // We can re-use the is_special_case check here.
+    u xpx;
+    xpx.f = x + x;
+    res.u = vec_sel (res.u, xpx.u, is_inf_or_ninf_or_nan);
+
+    vector float overflow_v = vec_splat (constants2.f, 0);
+    vector unsigned is_overflow = (vector unsigned) vec_cmpgt (xu.f, overflow_v);
+    vector unsigned overflowv = vec_splat (constants, 1);
+    res.u = vec_sel (res.u, overflowv, is_overflow);
+    vector float underflow_v = vec_splat (constants2.f, 1);
+    vector unsigned is_underflow = (vector unsigned) vec_cmplt (xu.f, underflow_v);
+    vector unsigned underflowv = vec_splat (constants, 3);
+    res.u = vec_sel (res.u, underflowv, is_underflow);
+  }
+  vector double xl = vec_unpackh (x);
+  vector double xr = vec_unpackl (x);
+  vector double InvLn2Nv = {constants2.d[1], constants2.d[1]};
+  vector double zl = InvLn2Nv * xl;
+  vector double zr = InvLn2Nv * xr;
+#if TOINT_INTRINSICS_VECTOR
+  vector double kdl = roundtoint(zl);
+  vector double kdl = roundtoint (zl);
+  v64u kil = converttoint (zl);
+  v64u kir = converttoint (zr);
+#else
+#define SHIFT __exp2f_data.shift
+  vector double shift = { SHIFT, SHIFT};
+  vector double kdl = zl + shift;
+  vector double kdr = zr + shift;
+  u kilu;
+  kilu.d = kdl;
+  u kiru;
+  kiru.d = kdr;
+  v64u kil = kilu.l;
+  v64u kir = kiru.l;
+  kdl -= shift;
+  kdr -= shift;
+#endif
+  vector double rl = zl - kdl;
+  vector double rr = zr - kdr;
+
+  v64u tl = {T[kil[0] % N], T[kil[1] % N]};
+  v64u tr = {T[kir[0] % N], T[kir[1] % N]};
+  tl += (kil << (52 - EXP2F_TABLE_BITS));
+  tr += (kir << (52 - EXP2F_TABLE_BITS));
+  u slu;
+  slu.l = tl;
+  u sru;
+  sru.l = tr;
+  vector double c = vec_ld(0, &C[0]);
+  vector double c0 = {c[0], c[0]};
+  vector double c1 = {c[1], c[1]};
+  zl = c0 * rl + c1;
+  zr = c0 * rr + c1;
+  vector double r2l = rl * rl;
+  vector double r2r = rr * rr;
+  vector double c2 = {C[2], C[2]};
+  vector double yl = c2 * rl + 1;
+  vector double yr = c2 * rr + 1;
+  yl = zl * r2l + yl;
+  yr = zr + r2r + yr;
+  yl = yl * slu.d;
+  yr = yr * sru.d;
+  vector float restmp = {(float)yl[0], (float)yl[1], (float)yr[0], (float)yr[1]};
+  return vec_sel(restmp, res.f, is_special_case);
+}
