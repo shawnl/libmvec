@@ -75,71 +75,71 @@ vector float _ZGVbN4v_expf (vector float x) {
 		//vector unsigned ninf = inf | (1 << 31);
 		//vector unsigned is_ninf = (vector unsigned)vec_cmpeq(xu.u, ninf);
 		vector unsigned is_inf_or_ninf_or_nan = (vector unsigned) vec_cmpge (xu.u, inf);
-    //res.u = vec_sel(res.u, zero, is_ninf);
-    res.u = zero; // We can re-use the is_special_case check here.
-    u xpx;
-    xpx.f = x + x;
-    res.u = vec_sel (res.u, xpx.u, is_inf_or_ninf_or_nan);
+		//res.u = vec_sel(res.u, zero, is_ninf);
+		res.u = zero; // We can re-use the is_special_case check here.
+		u xpx;
+		xpx.f = x + x;
+		res.u = vec_sel (res.u, xpx.u, is_inf_or_ninf_or_nan);
 
-    vector float overflow_v = vec_splat (constants2.f, 0);
-    vector unsigned is_overflow = (vector unsigned) vec_cmpgt (xu.f, overflow_v);
-    vector unsigned overflowv = vec_splat (constants, 1);
-    res.u = vec_sel (res.u, overflowv, is_overflow);
-    vector float underflow_v = vec_splat (constants2.f, 1);
-    vector unsigned is_underflow = (vector unsigned) vec_cmplt (xu.f, underflow_v);
-    vector unsigned underflowv = vec_splat (constants, 3);
-    res.u = vec_sel (res.u, underflowv, is_underflow);
-  }
-  vector double xl = vec_unpackh (x);
-  vector double xr = vec_unpackl (x);
-  vector double InvLn2Nv = {constants2.d[1], constants2.d[1]};
-  vector double zl = InvLn2Nv * xl;
-  vector double zr = InvLn2Nv * xr;
+		vector float overflow_v = vec_splat (constants2.f, 0);
+		vector unsigned is_overflow = (vector unsigned) vec_cmpgt (xu.f, overflow_v);
+		vector unsigned overflowv = vec_splat (constants, 1);
+		res.u = vec_sel (res.u, overflowv, is_overflow);
+		vector float underflow_v = vec_splat (constants2.f, 1);
+		vector unsigned is_underflow = (vector unsigned) vec_cmplt (xu.f, underflow_v);
+		vector unsigned underflowv = vec_splat (constants, 3);
+		res.u = vec_sel (res.u, underflowv, is_underflow);
+	}
+	vector double xl = vec_unpackh (x);
+	vector double xr = vec_unpackl (x);
+	vector double InvLn2Nv = {constants2.d[1], constants2.d[1]};
+	vector double zl = InvLn2Nv * xl;
+	vector double zr = InvLn2Nv * xr;
 #if TOINT_INTRINSICS_VECTOR
-  vector double kdl = roundtoint (zl);
-  vector double kdl = roundtoint (zl);
-  v64u kil = converttoint (zl);
-  v64u kir = converttoint (zr);
+	vector double kdl = roundtoint (zl);
+	vector double kdl = roundtoint (zl);
+	v64u kil = converttoint (zl);
+	v64u kir = converttoint (zr);
 #else
 #define SHIFT __exp2f_data.shift
-  vector double shift = { SHIFT, SHIFT};
-  vector double kdl = zl + shift;
-  vector double kdr = zr + shift;
-  u kilu;
-  kilu.d = kdl;
-  u kiru;
-  kiru.d = kdr;
-  v64u kil = kilu.l;
-  v64u kir = kiru.l;
-  kdl -= shift;
-  kdr -= shift;
+	vector double shift = { SHIFT, SHIFT};
+	vector double kdl = zl + shift;
+	vector double kdr = zr + shift;
+	u kilu;
+	kilu.d = kdl;
+	u kiru;
+	kiru.d = kdr;
+	v64u kil = kilu.l;
+	v64u kir = kiru.l;
+	kdl -= shift;
+	kdr -= shift;
 #endif
-  vector double rl = zl - kdl;
-  vector double rr = zr - kdr;
+	vector double rl = zl - kdl;
+	vector double rr = zr - kdr;
 
-  v64u tl = {T[kil[0] % N], T[kil[1] % N]};
-  v64u tr = {T[kir[0] % N], T[kir[1] % N]};
-  tl += (kil << (52 - EXP2F_TABLE_BITS));
-  tr += (kir << (52 - EXP2F_TABLE_BITS));
-  u slu;
-  slu.l = tl;
-  u sru;
-  sru.l = tr;
-  // This cast is obnoxious, but there is no vec_ld for double
-  vector double c = (vector double) vec_ld (0, (vector unsigned*) &C[0]);
-  vector double c0 = {c[0], c[0]};
-  vector double c1 = {c[1], c[1]};
-  zl = c0 * rl + c1;
-  zr = c0 * rr + c1;
-  vector double r2l = rl * rl;
-  vector double r2r = rr * rr;
-  vector double c2 = {C[2], C[2]};
-  vector double yl = c2 * rl + 1;
-  vector double yr = c2 * rr + 1;
-  yl = zl * r2l + yl;
-  yr = zr * r2r + yr;
-  yl = yl * slu.d;
-  yr = yr * sru.d;
-  vector float restmp = {(float) yl[0], (float) yl[1], (float) yr[0], (float) yr[1]};
-  return vec_sel (restmp, res.f, is_special_case);
+	v64u tl = {T[kil[0] % N], T[kil[1] % N]};
+	v64u tr = {T[kir[0] % N], T[kir[1] % N]};
+	tl += (kil << (52 - EXP2F_TABLE_BITS));
+	tr += (kir << (52 - EXP2F_TABLE_BITS));
+	u slu;
+	slu.l = tl;
+	u sru;
+	sru.l = tr;
+	// This cast is obnoxious, but there is no vec_ld for double
+	vector double c = (vector double) vec_ld (0, (vector unsigned*) &C[0]);
+	vector double c0 = {c[0], c[0]};
+	vector double c1 = {c[1], c[1]};
+	zl = c0 * rl + c1;
+	zr = c0 * rr + c1;
+	vector double r2l = rl * rl;
+	vector double r2r = rr * rr;
+	vector double c2 = {C[2], C[2]};
+	vector double yl = c2 * rl + 1;
+	vector double yr = c2 * rr + 1;
+	yl = zl * r2l + yl;
+	yr = zr * r2r + yr;
+	yl = yl * slu.d;
+	yr = yr * sru.d;
+	vector float restmp = {(float) yl[0], (float) yl[1], (float) yr[0], (float) yr[1]};
+	return vec_sel (restmp, res.f, is_special_case);
 }
