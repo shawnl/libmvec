@@ -18,8 +18,6 @@
 #include <altivec.h>
 #include <math.h>
 
-#define TOINT_INTRINSICS_VECTOR 0
-
 #include "exp2f_data.h"
 //#include <sysdeps/ieee754/flt-32/math_config.h>
 
@@ -37,13 +35,35 @@ typedef union {
 	float f;
 } us;
 
+#ifndef WANT_ROUNDING
+/* Correct special case results in non-nearest rounding modes.  */
+# define WANT_ROUNDING 1
+#endif
+
+#ifndef TOINT_INTRINSICS
+/* When set, the roundtoint and converttoint functions are provided with
+   the semantics documented below.  */
+# define TOINT_INTRINSICS 0
+#endif
+
+#if TOINT_INTRINSICS
+/* Round x to nearest int in all rounding modes, ties have to be rounded
+   consistently with converttoint so the results match.  If the result
+   would be outside of [-2^31, 2^31-1] then the semantics is unspecified.  */
+static inline vector double
+roundtoint (vector double x);
+
+/* Convert x to nearest int in all rounding modes, ties have to be rounded
+   consistently with roundtoint.  If the result is not representible in an
+   int32_t then the semantics is unspecified.  */
+static inline v64u
+converttoint (vector double x);
+#endif
+
 #define N (1 << EXP2F_TABLE_BITS)
 #define InvLn2N __exp2f_data.invln2_scaled
 #define T __exp2f_data.tab
 #define C __exp2f_data.poly_scaled
-
-#define OVERFLOWV 0x7f800000
-#define UNDERFLOWV 4
 
 vector float _ZGVbN4v_expf (vector float x) {
 	u res;
@@ -53,7 +73,9 @@ vector float _ZGVbN4v_expf (vector float x) {
 	c88.f = 88.0f;
 	us inf;
 	inf.f = INFINITY;
-	vector unsigned constants = {(c88.u & 0xfff00000) << 1, OVERFLOWV, inf.u, UNDERFLOWV};
+	us ninf;
+	ninf.f = -INFINITY;
+	vector unsigned constants = {(c88.u & 0xfff00000) << 1, ninf.u, inf.u, 0};
 	us invLn2Nu;
 	invLn2Nu.d = InvLn2N;
 	u constants2;
@@ -70,32 +92,28 @@ vector float _ZGVbN4v_expf (vector float x) {
 	vector unsigned zero = {0, 0, 0, 0};
 	vector unsigned v88 = vec_splat (constants, 0);
 	vector unsigned is_special_case = (vector unsigned) vec_cmpge (xu.u << 1, v88);
-	if (!vec_all_eq (is_special_case, zero)) {
+	if (__glibc_unlikely (!vec_all_eq (is_special_case, zero))) {
 		vector unsigned inf = vec_splat (constants, 2);
-		//vector unsigned ninf = inf | (1 << 31);
-		//vector unsigned is_ninf = (vector unsigned)vec_cmpeq(xu.u, ninf);
 		vector unsigned is_inf_or_ninf_or_nan = (vector unsigned) vec_cmpge (xu.u, inf);
-		//res.u = vec_sel(res.u, zero, is_ninf);
-		res.u = zero; // We can re-use the is_special_case check here.
+		res.u = zero; // We can re-use the is_special_case check here to check for ninf.
 		u xpx;
 		xpx.f = x + x;
 		res.u = vec_sel (res.u, xpx.u, is_inf_or_ninf_or_nan);
 
 		vector float overflow_v = vec_splat (constants2.f, 0);
 		vector unsigned is_overflow = (vector unsigned) vec_cmpgt (xu.f, overflow_v);
-		vector unsigned overflowv = vec_splat (constants, 1);
-		res.u = vec_sel (res.u, overflowv, is_overflow);
+		res.u = vec_sel (res.u, inf, is_overflow);
 		vector float underflow_v = vec_splat (constants2.f, 1);
+                vector unsigned ninf = vec_splat (constants, 2);
 		vector unsigned is_underflow = (vector unsigned) vec_cmplt (xu.f, underflow_v);
-		vector unsigned underflowv = vec_splat (constants, 3);
-		res.u = vec_sel (res.u, underflowv, is_underflow);
+		res.u = vec_sel (res.u, ninf, is_underflow);
 	}
 	vector double xl = vec_unpackh (x);
 	vector double xr = vec_unpackl (x);
 	vector double InvLn2Nv = {constants2.d[1], constants2.d[1]};
 	vector double zl = InvLn2Nv * xl;
 	vector double zr = InvLn2Nv * xr;
-#if TOINT_INTRINSICS_VECTOR
+#if TOINT_INTRINSICS
 	vector double kdl = roundtoint (zl);
 	vector double kdl = roundtoint (zl);
 	v64u kil = converttoint (zl);
