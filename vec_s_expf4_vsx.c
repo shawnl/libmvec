@@ -18,8 +18,7 @@
 #include <altivec.h>
 #include <math.h>
 
-#include "exp2f_data.h"
-//#include <sysdeps/ieee754/flt-32/math_config.h>
+#include "math_config_flt.h"
 
 typedef vector long long unsigned v64u;
 typedef union {
@@ -35,37 +34,14 @@ typedef union {
 	float f;
 } us;
 
-#ifndef WANT_ROUNDING
-/* Correct special case results in non-nearest rounding modes.  */
-# define WANT_ROUNDING 1
-#endif
-
-#ifndef TOINT_INTRINSICS
-/* When set, the roundtoint and converttoint functions are provided with
-   the semantics documented below.  */
-# define TOINT_INTRINSICS 0
-#endif
-
-#if TOINT_INTRINSICS
-/* Round x to nearest int in all rounding modes, ties have to be rounded
-   consistently with converttoint so the results match.  If the result
-   would be outside of [-2^31, 2^31-1] then the semantics is unspecified.  */
-static inline vector double
-roundtoint (vector double x);
-
-/* Convert x to nearest int in all rounding modes, ties have to be rounded
-   consistently with roundtoint.  If the result is not representible in an
-   int32_t then the semantics is unspecified.  */
-static inline v64u
-converttoint (vector double x);
-#endif
-
 #define N (1 << EXP2F_TABLE_BITS)
 #define InvLn2N __exp2f_data.invln2_scaled
 #define T __exp2f_data.tab
 #define C __exp2f_data.poly_scaled
 
-vector float _ZGVbN4v_expf (vector float x) {
+vector float
+_ZGVbN4v_expf (vector float x)
+{
 	u res;
 	u xu;
 	xu.f = x;
@@ -76,43 +52,50 @@ vector float _ZGVbN4v_expf (vector float x) {
 	us ninf;
 	ninf.f = -INFINITY;
 	vector unsigned constants = {(c88.u & 0xfff00000) << 1, ninf.u, inf.u, 0};
-	us invLn2Nu;
-	invLn2Nu.d = InvLn2N;
-	u constants2;
-	us overflowu;
-	overflowu.f = 0x1.62e42ep6f;
-	us underflowu;
-	underflowu.f = -0x1.9fe368p6f;
-#ifdef __ORDER_BIG_ENDIAN__
-	v64u __init1 = {((uint64_t) overflowu.u << 32) + (uint64_t) underflowu.u, invLn2Nu.l};
-#else
-	v64u __init1 = {(uint64_t) overflowu.u + ((uint64_t) underflowu.u << 32), invLn2Nu.l};
-#endif
-	constants2.l = __init1;
+	vector float constants2 = {0x1.62e42ep6f, -0x1.9fe368p6f, 0, 0};
 	vector unsigned zero = {0, 0, 0, 0};
 	vector unsigned v88 = vec_splat (constants, 0);
 	vector unsigned is_special_case = (vector unsigned) vec_cmpge (xu.u << 1, v88);
+	vector unsigned is_special_not_covered = is_special_case;
 	if (__glibc_unlikely (!vec_all_eq (is_special_case, zero))) {
 		vector unsigned inf = vec_splat (constants, 2);
 		vector unsigned is_inf_or_ninf_or_nan = (vector unsigned) vec_cmpge (xu.u, inf);
-		res.u = zero; // We can re-use the is_special_case check here to check for ninf.
 		u xpx;
 		xpx.f = x + x;
-		res.u = vec_sel (res.u, xpx.u, is_inf_or_ninf_or_nan);
+		res.u = xpx.u;
+		is_special_not_covered &= ~is_inf_or_ninf_or_nan;
+		vector unsigned ninf = vec_splat (constants, 1);
+		vector unsigned is_ninf = (vector unsigned) vec_cmpeq (xu.u, ninf);
+		res.u = vec_sel (res.u, zero, is_ninf);
 
-		vector float overflow_v = vec_splat (constants2.f, 0);
+		vector float overflow_v = vec_splat (constants2, 0);
 		vector unsigned is_overflow = (vector unsigned) vec_cmpgt (xu.f, overflow_v);
-		res.u = vec_sel (res.u, inf, is_overflow);
-		vector float underflow_v = vec_splat (constants2.f, 1);
-                vector unsigned ninf = vec_splat (constants, 2);
+		if (__glibc_unlikely (!vec_all_eq (is_overflow, zero)))
+		{
+			// This branch is because we are generating an overflow fp flag
+			us ofu;
+			ofu.f = __math_oflowf(0);
+			vector unsigned of = {ofu.u, ofu.u, ofu.u, ofu.u};
+			res.u = vec_sel (res.u, of, is_overflow);
+			is_special_not_covered &= ~is_overflow;
+		}
+		vector float underflow_v = vec_splat (constants2, 1);
 		vector unsigned is_underflow = (vector unsigned) vec_cmplt (xu.f, underflow_v);
-		res.u = vec_sel (res.u, ninf, is_underflow);
+		if (__glibc_unlikely (!vec_all_eq (is_underflow, zero)))
+		{
+                        // This branch is because we are generating an underflow fp flag
+                        us ufu;
+                        ufu.f = __math_uflowf(0);
+                        vector unsigned uf = {ufu.u, ufu.u, ufu.u, ufu.u};
+                        res.u = vec_sel (res.u, uf, is_underflow);
+                        is_special_not_covered &= ~is_underflow;
+		}
 	}
+
 	vector double xl = vec_unpackh (x);
 	vector double xr = vec_unpackl (x);
-	vector double InvLn2Nv = {constants2.d[1], constants2.d[1]};
-	vector double zl = InvLn2Nv * xl;
-	vector double zr = InvLn2Nv * xr;
+	vector double zl = InvLn2N * xl;
+	vector double zr = InvLn2N * xr;
 #if TOINT_INTRINSICS
 	vector double kdl = roundtoint (zl);
 	vector double kdl = roundtoint (zl);
@@ -120,17 +103,16 @@ vector float _ZGVbN4v_expf (vector float x) {
 	v64u kir = converttoint (zr);
 #else
 #define SHIFT __exp2f_data.shift
-	vector double shift = { SHIFT, SHIFT};
-	vector double kdl = zl + shift;
-	vector double kdr = zr + shift;
+	vector double kdl = zl + SHIFT;
+	vector double kdr = zr + SHIFT;
 	u kilu;
 	kilu.d = kdl;
 	u kiru;
 	kiru.d = kdr;
 	v64u kil = kilu.l;
 	v64u kir = kiru.l;
-	kdl -= shift;
-	kdr -= shift;
+	kdl -= SHIFT;
+	kdr -= SHIFT;
 #endif
 	vector double rl = zl - kdl;
 	vector double rr = zr - kdr;
@@ -144,20 +126,16 @@ vector float _ZGVbN4v_expf (vector float x) {
 	u sru;
 	sru.l = tr;
 	// This cast is obnoxious, but there is no vec_ld for double
-	vector double c = (vector double) vec_ld (0, (vector unsigned*) &C[0]);
-	vector double c0 = {c[0], c[0]};
-	vector double c1 = {c[1], c[1]};
-	zl = c0 * rl + c1;
-	zr = c0 * rr + c1;
+	zl = C[0] * rl + C[1];
+	zr = C[0] * rr + C[1];
 	vector double r2l = rl * rl;
 	vector double r2r = rr * rr;
-	vector double c2 = {C[2], C[2]};
-	vector double yl = c2 * rl + 1;
-	vector double yr = c2 * rr + 1;
+	vector double yl = C[2] * rl + 1;
+	vector double yr = C[2] * rr + 1;
 	yl = zl * r2l + yl;
 	yr = zr * r2r + yr;
 	yl = yl * slu.d;
 	yr = yr * sru.d;
 	vector float restmp = {(float) yl[0], (float) yl[1], (float) yr[0], (float) yr[1]};
-	return vec_sel (restmp, res.f, is_special_case);
+	return vec_sel (restmp, res.f, is_special_case & ~is_special_not_covered);
 }
