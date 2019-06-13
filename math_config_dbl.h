@@ -118,27 +118,27 @@ xflow (uint32_t sign, double y)
   y = math_opt_barrier (sign ? -y : y) * y;
   return y;
 }
-
-attribute_hidden double
+/*
+double
 __math_uflow (uint32_t sign)
 {
   return xflow (sign, 0x1p-767);
 }
 
-attribute_hidden double
+double
 __math_oflow (uint32_t sign)
 {
   return xflow (sign, 0x1p769);
 }
 
-
+*/
 /* Error handling tail calls for special cases, with a sign argument.
    The sign of the return value is set if the argument is non-zero.  */
 
 /* The result overflows.  */
-attribute_hidden double __math_oflow (uint32_t);
+//attribute_hidden double __math_oflow (uint32_t);
 /* The result underflows to 0 in nearest rounding mode.  */
-attribute_hidden double __math_uflow (uint32_t);
+//attribute_hidden double __math_uflow (uint32_t);
 /* The result underflows to 0 in some directed rounding mode only.  */
 attribute_hidden double __math_may_uflow (uint32_t);
 /* Division by zero.  */

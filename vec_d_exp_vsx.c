@@ -12,6 +12,8 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+/* Based on sysdeps/ieee754/dbl-64/e_exp.c which came from
+   Szabolcs Nagy at ARM Ltd. */
 #include <altivec.h>
 #include <math.h>
 
@@ -96,7 +98,7 @@ static inline uint32_t top12(double x)
 vector double
 _ZGVbN2v_exp (vector double x)
 {
-	v64u abstop, is_special_case, is_special_case2, ki, idx, top, sbits;
+	v64u abstop, is_special_case, is_special_case2, idx, top, sbits;
 	vector double kd, z, r, r2, scale, tail, tmp;
 	u t, t2;
 	u res;
@@ -117,6 +119,8 @@ _ZGVbN2v_exp (vector double x)
 	{
 		for (int m=0;m<2;++m)
 		{
+			if (!is_special_case[m])
+				continue;
 			double v;
 			uint32_t abstops = abstop[m] >> 52;
 			if (!is_special_case[m])
@@ -129,12 +133,14 @@ _ZGVbN2v_exp (vector double x)
 			if (abstops >= top12(1024.0)) {
 				if (asuint64(v) == asuint64(-INFINITY))
 					res.d[m] = 0.0;
-				if (abstops >= top12(INFINITY))
+				else if (abstops >= top12(INFINITY))
 					res.d[m] = 1.0 + v;
-				if (asuint64(v) >> 63)
+				else if (asuint64(v) >> 63)
 					res.d[m] = __math_uflow(0);
 				else
 					res.d[m] = __math_oflow(0);
+				/* prevent is_special_case2 from matching */
+				abstop[m] = 1;
 			} else {
 	 			/* Large x is special cased below.  */
  				abstop[m] = 0;
@@ -145,27 +151,25 @@ _ZGVbN2v_exp (vector double x)
 	/* exp(x) = 2^(k/N) * exp(r), with exp(r) in [2^(-1/2N),2^(1/2N)].  */
 	/* x = ln2/N*k + r, with int k and r in [-ln2/2N, ln2/2N].  */
 	z = InvLn2N * x;
+	u kdu;
 #if TOINT_INTRINSICS
 	kd = roundtoint(z);
-	ki = converttoint(z);
+	kdu.l = converttoint(z);
 #elif EXP_USE_TOINT_NARROW
 	/* z - kd is in [-0.5-2^-16, 0.5] in all rounding modes.  */
 	kd = z + Shift;
-	u kdu;
-	kdu.d = kd;
 	kdu.l >>= 16;
 	kd = (vector double)(vector int)kdu.l;
 #else
 	/* z - kd is in [-1, 1] in non-nearest rounding modes.  */
 	kd = z + Shift;
-	u kdu;
 	kdu.d = kd;
 	kd -= Shift;
 #endif
 	r = x + kd * NegLn2hiN + kd * NegLn2loN;
 	/* 2^(k/N) ~= scale * (1 + tail).  */
 	idx = 2 * (kdu.l % N);
-	top = ki << (52 - EXP_TABLE_BITS);
+	top = kdu.l << (52 - EXP_TABLE_BITS);
 	v64u load3 = {T[idx[0]], T[idx[1]]};
 	t.l = load3;
 	v64u load4 = {T[idx[0] + 1], T[idx[1] + 1]};
@@ -185,7 +189,7 @@ _ZGVbN2v_exp (vector double x)
 		u sc2;
 		for (int m=0;m<2;++m)
 		{
-			sc2.d[m] = specialcase(tmp[m], sbits[m], ki[m]);
+			sc2.d[m] = specialcase(tmp[m], sbits[m], kdu.l[m]);
 		}
 		res.l = vec_sel (res.l, sc2.l, is_special_case2);
 	}

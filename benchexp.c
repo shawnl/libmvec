@@ -8,7 +8,7 @@ double d;
 long long unsigned l;
 unsigned u;
 } us;
-#define AVOID_SPECIAL_NUMBERS 1
+#define AVOID_SPECIAL_NUMBERS 0
 #include <altivec.h>
 #include <math.h>
 #define EXIT_UNSUPPORTED 77
@@ -18,8 +18,8 @@ unsigned u;
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#define SIZEM 32
-#define SIZE SIZEM * 1024 * 1024
+#define SIZEM 1
+#define SIZE SIZEM * 1024
 int main() {
   uint64_t ret;
   uint64_t *data = malloc(SIZE * 4);
@@ -80,10 +80,10 @@ clock_gettime(CLOCK_MONOTONIC, &w);
   }
 clock_gettime(CLOCK_MONOTONIC, &e);
   double t[3] = {(double)(q.tv_sec * 1000000) + q.tv_nsec / 1000, (double)(w.tv_sec * 1000000) + w.tv_nsec / 1000, (double)(e.tv_sec * 1000000) + e.tv_nsec / 1000};
-  printf("non-opt: %f (%f MiB/s)\nopt: %f (%f MiB/s) (%f)\n",
-    (t[2] - t[1]) / 1000000, SIZEM / ((t[2] - t[1]) / 1000000),
-    (t[1] - t[0]) / 1000000, SIZEM / ((t[1] - t[0]) / 1000000),
-    (t[2] - t[1]) / (t[1] - t[0]));
+//  printf("non-opt: %f (%f MiB/s)\nopt: %f (%f MiB/s) (%f)\n",
+//    (t[2] - t[1]) / 1000000, SIZEM / ((t[2] - t[1]) / 1000000),
+  //  (t[1] - t[0]) / 1000000, SIZEM / ((t[1] - t[0]) / 1000000),
+    //(t[2] - t[1]) / (t[1] - t[0]));
 table[j] = t[2] - t[1];
 tableopt[j] = t[1] - t[0];
 }
@@ -101,6 +101,6 @@ for (int j=0;j<20;j++) {
   sd +=( (double)(table[j] - mean) * (double)(table[j] - mean)) / 1000000000000.0;
   sdopt +=( (double)(tableopt[j] - mean) * (double)(tableopt[j] - mean)) / 1000000000000.0;
 }
-printf("opt: mean %f (sd %f)\nnonopt: mean %f (sd %f)\n", SIZEM / (meanopt / 1000000), sqrt(sdopt), SIZEM / (mean / 1000000), sqrt(sd));
+//printf("opt: mean %f (sd %f)\nnonopt: mean %f (sd %f)\n", SIZEM / (meanopt / 1000000), sqrt(sdopt), SIZEM / (mean / 1000000), sqrt(sd));
   return 0;
 }
